@@ -7,33 +7,32 @@ first_block := $D0EB00
 block_size 	:= $100
 
 test_block  := first_block + block_size * 0
-dummy_block := first_block + block_size * 1
-mem_block		:= first_block + block_size * 2
+dummy_block := first_block + block_size * 2
+mem_block		:= first_block + block_size * 3
 
-
-data:
-rb (-$) and $FF
-inc_table
-dec_table
-same_table
 
 ;math tables ----------------------------------------------------------------------
 
-macro inc_table
+rb (-$) and $FF
+inc_table:  make_inc_table
+dec_table:  make_dec_table
+same_table: make_same_table
+
+macro make_inc_table
 	repeat 255
 		db %
 	end repeat
 	db 0
 end macro
 
-macro dec_table
+macro make_dec_table
 	db $FF
 	repeat 255
 		db % - 1
 	end repeat
 end macro
 
-macro same_table
+macro make_same_table
 	repeat 256
 		db % - 1
 	end repeat
@@ -43,6 +42,12 @@ end macro
 
 
 ;conditionals -----------------------------------------------------------------
+
+macro offset_hl base, offset
+; puts a pointer in hl using a <256 byte offset and a base % 256
+	ld hl, base
+	ld l, offset
+end macro
 
 macro hl_p_is_zero
 ; returns if (hl) = 0
@@ -168,16 +173,69 @@ end macro
 
 ;------------------------------------------------------------------------------
 
+
+;stack ------------------------------------------------------------------------
+
+stack_p0: dl $D1A800
+stack_p1: dl 0
+stack_p2: dl 0
+
+macro init_stacks
+	;ld (stack_p0), sp
+	plus_one_init stack_p0, stack_p1
+	plus_one_init stack_p1, stack_p2
+end macro
+
+macro plus_one_init from, to
+	ld hl, dec_table
+	ld a, (from + 0)
+	ld l, a
+	ld a, (hl)
+	ld (to + 0), a			; inc least sig byte
+	ld hl, from + 0 		
+	ld hl, test_block + $FF
+	ld bc, same_table
+	ld (hl), bc
+	ld a, (to + 0)
+	ld l, a
+	ld bc, dec_table
+	ld (hl), bc
+	ld hl, test_block + $FF
+	ld hl, (hl)					; hl contains same/dec_table depending on if we
+											;  should dec second byte
+	ld a, (from + 1)
+	ld l, a
+	ld a, (hl)
+	ld (to + 1), a			; inc second byte
+	ld hl, test_block + $FF
+	ld bc, same_table
+	ld (hl), bc
+	ld l, a							; a contains (to + 1)
+	ld bc, dec_table
+	ld (hl), bc
+	ld hl, test_block + $FF
+	ld hl, (hl)					; hl contains same/dec_table depending on if we
+											;  should dec third byte
+	ld a, (from + 2)
+	ld l, a
+	ld a, (hl)
+	ld (to + 2), a			; inc second byte
+end macro
+
+;------------------------------------------------------------------------------
+
 macro open_debugger
 	scf
 	sbc    hl,hl
 	ld     (hl),2
 end macro
 
-
 jumping:  db false
 jmp_loc: 	db 0
 
 public _main
 _main:
+	init_stacks
+	open_debugger
 	ret
+	
