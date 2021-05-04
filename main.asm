@@ -8,7 +8,7 @@ block_size 	:= $100
 
 test_block  := first_block + block_size * 0
 dummy_block := first_block + block_size * 2
-mem_block		:= first_block + block_size * 3
+mem_block		:= first_block + block_size * 4
 
 
 ;math tables ----------------------------------------------------------------------
@@ -123,7 +123,79 @@ end macro
 ;------------------------------------------------------------------------------
 
 
-;inc/dec ----------------------------------------------------------------------
+;control flow ------------------------------------------------------------------
+
+cur_jmp_id = 0
+
+off: 				db false
+terminate: 	db false
+jmp_target: db 0
+
+inc_table_dum: dl inc_table
+dec_table_dum: dl dec_table
+
+macro turn_on_if_a
+; enables execution if a = true
+	ld (test_block  + 0), dummy_block
+	ld (test_block  + 3), test_block
+	ld (test_block  + 6), inc_table
+	ld (test_block  + 9), dec_table
+	ld (dummy_block + 6), same_table
+	ld (dummy_block + 9), same_table
+	;-----------------; setup inc_table_dum
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;load dummy or real block
+	ld l, 6
+	ld bc, (hl)				;find inc_table or same_table
+	ld hl, inc_table_dum
+	ld (hl), bc
+	;-----------------; setup dec_table_dum
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;load dummy or real block
+	ld l, 9
+	ld bc, (hl)				;find dec_table or same_table
+	ld hl, dec_table_dum
+	ld (hl), bc
+	;-----------------; setup off
+	ld (test_block + 0), true
+	ld (test_block + 3), false
+	ld hl, test_block
+	ld l, a
+	ld b, (hl)
+	ld hl, off
+	ld (hl), b
+end macro
+
+macro turn_off_if_a
+; disables execution if a = true
+	ld (test_block  + 0), test_block
+	ld (test_block  + 3), dummy_block
+	ld (test_block  + 6), inc_table
+	ld (test_block  + 9), dec_table
+	ld (dummy_block + 6), same_table
+	ld (dummy_block + 9), same_table
+	;-----------------; setup inc_table_dum
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;load dummy or real block
+	ld l, 6
+	ld bc, (hl)				;find inc_table or same_table
+	ld hl, inc_table_dum
+	ld (hl), bc
+	;-----------------; setup dec_table_dum
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;load dummy or real block
+	ld l, 9
+	ld bc, (hl)				;find dec_table or same_table
+	ld hl, dec_table_dum
+	ld (hl), bc
+	;-----------------; setup off
+	ld hl, off
+	ld (hl), a
+end macro
 
 macro jmp_if_a to
 ; jumps to the given location if a = true
@@ -134,6 +206,17 @@ macro jmp_if_a to
 	ld (hl), a  ;if a is true we will be stoppped
 	ld a, to
 	ld (jmp_loc), a
+end macro
+
+macro call_if_a adr
+	; calls an adress if a = true
+	
+	; running = false
+	; stack_p1 = code_start
+	; stack_p2 = adr
+	; sp = stack_p2
+	
+	cur_jmp_id = cur_jmp_id + 1
 end macro
 
 ;------------------------------------------------------------------------------
@@ -224,6 +307,7 @@ end macro
 
 ;------------------------------------------------------------------------------
 
+
 macro open_debugger
 	scf
 	sbc    hl,hl
@@ -237,5 +321,6 @@ public _main
 _main:
 	init_stacks
 	open_debugger
+code_start:
 	ret
 	
