@@ -1,0 +1,183 @@
+include 'ti84pceg.inc'
+
+false := 0
+true  := 3
+
+first_block := $D0EB00
+block_size 	:= $100
+
+test_block  := first_block + block_size * 0
+dummy_block := first_block + block_size * 1
+mem_block		:= first_block + block_size * 2
+
+
+data:
+rb (-$) and $FF
+inc_table
+dec_table
+same_table
+
+;math tables ----------------------------------------------------------------------
+
+macro inc_table
+	repeat 255
+		db %
+	end repeat
+	db 0
+end macro
+
+macro dec_table
+	db $FF
+	repeat 255
+		db % - 1
+	end repeat
+end macro
+
+macro same_table
+	repeat 256
+		db % - 1
+	end repeat
+end macro
+
+;------------------------------------------------------------------------------
+
+
+;conditionals -----------------------------------------------------------------
+
+macro hl_p_is_zero
+; returns if (hl) = 0
+; args:
+;  (hl) : the byte to check if it zero
+; return:
+;  a : if (hl) = 0
+; destroyed:
+;  bc
+	ld a, false
+	ld (test_block), a
+	ld bc, test_block
+	ld c, (hl)
+	ld a, true
+	ld (bc), a
+	ld a, (test_block)
+end macro
+
+macro is_correct_block block
+; tests if the given block is the block we are searching for
+; args:
+;  block : the block we are checking against
+; return:
+;  a : block = (jmp_loc)
+; destroyed:
+;  bc
+	ld a, false
+	ld (test_block + block), a
+	ld bc, test_block
+	ld c, (jmp_loc)
+	ld a, true
+	ld (bc), a
+	ld a, (test_block + block)
+end macro
+
+macro select_pointer p1, p2
+; returns p1 if a = false or p2 when a = true
+; args:
+;  a : which pointer to select
+; return:
+;  hl : the selected pointer
+	ld hl, p1
+	ld (test_block), hl
+	ld hl, p2
+	ld (test_block + true), hl
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)
+end macro
+
+macro select_pointer_bc p1, p2
+; returns p1 if a = false or p2 when a = true
+; args:
+;  a : which pointer to select
+; return:
+;  bc : the selected pointer
+; destroyes:
+;  de
+	ld d, h
+	ld e, l
+	ld hl, p1
+	ld (test_block), hl
+	ld hl, p2
+	ld (test_block + true), hl
+	ld hl, test_block
+	ld l, a
+	ld bc, (hl)
+	ld h, d
+	ld l, e
+end macro
+
+
+;------------------------------------------------------------------------------
+
+
+;inc/dec ----------------------------------------------------------------------
+
+macro jmp_if_a to
+; jumps to the given location if a = true
+; args:
+;  a : whether to jump
+; returns:
+;  n/a
+	ld (hl), a  ;if a is true we will be stoppped
+	ld a, to
+	ld (jmp_loc), a
+end macro
+
+;------------------------------------------------------------------------------
+
+
+;inc/dec ----------------------------------------------------------------------
+
+macro inc_hl_p
+; increments the byte pointed to by hl (unless jumping)
+; args:
+;	 (hl) : the byte to increment
+; return:
+;  n/a
+; destroyed:
+;  bc, a
+	ld a, (jumping)
+	select_pointer_bc inc_block, same_block
+	ld c, (hl)
+	ld a, (bc)
+	ld (hl), a
+end macro
+
+macro dec_hl_p
+; decrements the byte pointed to by hl (unless jumping)
+; args:
+;	 (hl) : the byte to decrement
+; return:
+;  n/a
+; destroyed:
+;  bc, a
+	ld a, (jumping)
+	select_pointer_bc dec_block, same_block
+	ld c, (hl)
+	ld a, (bc)
+	ld (hl), a
+end macro
+
+;------------------------------------------------------------------------------
+
+macro open_debugger
+	scf
+	sbc    hl,hl
+	ld     (hl),2
+end macro
+
+
+jumping:  db false
+jmp_loc: 	db 0
+
+public _main
+_main:
+	ret
