@@ -213,9 +213,16 @@ macro add_code_start_to_stack
 	ld sp, (stack_p1)
 end macro
 
-macro terminate_if_a
-	turn_off_if_a
-	ld sp, (stack_p0) 	;the final ret will now exit the program
+macro terminate_if_on
+	ld hl, (stack_p0)
+	ld (test_block + 0), hl
+	ld (test_block + 3), sp
+	ld hl, test_block
+	ld a, (off)
+	ld l, a
+	ld hl, (hl)
+	ld (test_block), hl		
+	ld sp, (test_block) 	;the final ret will now exit the program if we were on
 end macro
 
 macro jmp_if_a to
@@ -224,6 +231,8 @@ macro jmp_if_a to
 ;  a : whether to jump
 ; returns:
 ;  n/a
+
+	;IMPLEMENT DON'T JUMP IF OFF
 	ld hl, dummy_block
 	ld (test_block + 0), hl
 	ld hl, jmp_target
@@ -407,19 +416,15 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
+	open_debugger
 
 code_start:
-	open_debugger
 
 	add_code_start_to_stack
 
 	ld a, true
-	call_if_a ti.PutC
-
-	;ld a, true
-	;terminate_if_a
-
-	ld a, 65
+	ld (off), a
+	terminate_if_on
 
 	ret
 	
