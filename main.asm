@@ -41,7 +41,6 @@ end macro
 ;------------------------------------------------------------------------------
 
 
-
 ;control flow ------------------------------------------------------------------
 
 cur_jmp_id = 0
@@ -101,7 +100,6 @@ macro turn_on_if_a
 	ld (off), a
 end macro
 
-
 macro turn_off_if_a
 ; disables execution if a = true
 	ld hl, test_block 
@@ -139,7 +137,6 @@ macro turn_off_if_a
 	ld hl, off
 	ld (hl), a
 end macro
-
 
 macro add_code_start_to_stack
 	; adds code_start to the stack at stack_p1
@@ -237,11 +234,6 @@ macro call_if_a adr
 	jmp_dest cur_jmp_id	
 	ld a, d                             ; ld_jmp x
 	jmp_if_a cur_jmp_id
-
-	;   
-	; sp = stack_p2
-	; jmp_dest x
-	; 	ld_jmp x
 	
 	cur_jmp_id = cur_jmp_id + 1
 end macro
@@ -251,32 +243,102 @@ end macro
 
 ;inc/dec ----------------------------------------------------------------------
 
-macro inc_hl_p ;x
-; increments the byte pointed to by hl (unless jumping)
-; args:
-;	 (hl) : the byte to increment
-; return:
-;  n/a
-; destroyed:
-;  bc, a
-	ld a, (jumping)
-	select_pointer_bc inc_block, same_block
-	ld c, (hl)
-	ld a, (bc)   		
+mem_pointer: dl $D100FF;mem_block
+
+macro inc_mem_pointer
+; 24 bit increments the mem pointer
+	ld hl, (inc_table_dum)
+	ld a, (mem_pointer)
+	ld l, a
+	ld a, (hl)
+	ld (mem_pointer), a
+	
+	;----------
+	
+	ld a, (mem_pointer + 1)
+	ld (test_block + $00), a            ;test_block + $00	
+	ld hl, (inc_table_dum)
+	ld a, (mem_pointer + 1)
+	ld l, a
+	ld d, (hl)	;d contains (mem_pointer + 1) + 1
+	ld hl, test_block
+	ld a, (mem_pointer + 0)
+	ld l, a
+	ld (hl), d
+	ld a, (test_block + $00)
+	ld (mem_pointer + 1), a
+
+	;----------
+
+	;ld a, (mem_pointer + 2)
+	;ld (test_block + $00), a            ;test_block + $00	
+	;ld hl, (inc_table_dum)
+	;ld a, (mem_pointer + 2)
+	;ld l, a
+	;ld d, (hl)	;d contains (mem_pointer + 1) + 1
+	;ld hl, test_block
+	;ld a, (mem_pointer)
+	;ld l, a
+	;ld (hl), d
+	;ld a, (test_block + $00)
+	;ld (mem_pointer + 2), a
+	
+end macro
+
+macro dec_mem_pointer
+; 24 bit decrements the mem pointer
+	ld hl, (dec_table_dum)
+	ld a, (mem_pointer)
+	ld l, a
+	ld a, (hl)
+	ld (mem_pointer), a
+	
+	;----------
+	
+	ld a, (mem_pointer + 1)
+	ld (test_block + $FF), a            ;test_block + $FF
+	ld hl, (dec_table_dum)
+	ld a, (mem_pointer + 1)
+	ld l, a
+	ld d, (hl)	;d contains (mem_pointer + 1) + 1
+	ld hl, test_block
+	ld a, (mem_pointer + 0)
+	ld l, a
+	ld (hl), d
+	ld a, (test_block + $FF)
+	ld (mem_pointer + 1), a
+
+	;----------
+
+	;ld a, (mem_pointer + 2)
+	;ld (test_block + $FF), a            ;test_block + $FF
+	;ld hl, (dec_table_dum)
+	;ld a, (mem_pointer + 2)
+	;ld l, a
+	;ld d, (hl)	;d contains (mem_pointer + 1) + 1
+	;ld hl, test_block
+	;ld a, (mem_pointer + 1)
+	;ld l, a
+	;ld (hl), d
+	;ld a, (test_block + $FF)
+	;ld (mem_pointer + 2), a
+	
+end macro
+
+macro inc_hl_p
+; increments the byte pointed to by hl when on
+	ld bc, (inc_table_dum)
+	ld a, (hl)
+	ld c, a
+	ld a, (bc)
 	ld (hl), a
 end macro
 
-macro dec_hl_p ;x
-; decrements the byte pointed to by hl (unless jumping)
-; args:
-;	 (hl) : the byte to decrement
-; return:
-;  n/a
-; destroyed:
-;  bc, a
-	ld a, (jumping)
-	select_pointer_bc dec_block, same_block
-	ld c, (hl)
+macro dec_hl_p
+; decrements the byte pointed to by hl when pn
+	ld bc, (dec_table_dum)
+	ld a, (hl)
+	ld c, a
 	ld a, (bc)
 	ld (hl), a
 end macro
@@ -357,6 +419,11 @@ _main:
 code_start:
 	add_code_start_to_stack
 
+	open_debugger
+
+	ld hl, mem_pointer
+
+	inc_mem_pointer
 	
 	terminate_if_on
 	ret
