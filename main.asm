@@ -267,10 +267,34 @@ end macro
 
 macro call_if_a adr
 	; calls an adress if a = true
-	
+	ld hl, dummy_block                 ;(stack_p2) = adr
+	ld (test_block + 0), hl    
+	ld hl, (stack_p2)
+	ld (test_block + 3), hl
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)
+	ld bc, adr
+	ld (hl), bc
+
+	ld hl, (stack_p1)
+	ld (test_block + 0), hl
+	ld hl, (stack_p2)
+	ld (test_block + 3), hl
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)
+	ld (test_block), hl
+	ld sp, (test_block)
+
+	ld d, a                             ; jmp_dest x
+	jmp_dest cur_jmp_id	
+	ld a, d                             ; ld_jmp x
+	jmp_if_a cur_jmp_id
+
+	;   
+	; sp = stack_p2
 	; jmp_dest x
-	;   stack_p2 = adr  
-	;   sp = stack_p2
 	; 	ld_jmp x
 	
 	cur_jmp_id = cur_jmp_id + 1
@@ -383,23 +407,19 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-	open_debugger
 
 code_start:
+	open_debugger
 
-	;add_code_start_to_stack
+	add_code_start_to_stack
 
 	ld a, true
-	jmp_if_a $0A
-	
-	nop
-	nop
-	nop
-	
-	jmp_dest $0B
+	call_if_a ti.PutC
 
 	;ld a, true
 	;terminate_if_a
+
+	ld a, 65
 
 	ret
 	
