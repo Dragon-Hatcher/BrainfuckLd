@@ -41,87 +41,6 @@ end macro
 ;------------------------------------------------------------------------------
 
 
-;conditionals -----------------------------------------------------------------
-
-macro offset_hl base, offset
-; puts a pointer in hl using a <256 byte offset and a base % 256
-	ld hl, base
-	ld l, offset
-end macro
-
-macro hl_p_is_zero
-; returns if (hl) = 0
-; args:
-;  (hl) : the byte to check if it zero
-; return:
-;  a : if (hl) = 0
-; destroyed:
-;  bc
-	ld a, false
-	ld (test_block), a
-	ld bc, test_block
-	ld c, (hl)
-	ld a, true
-	ld (bc), a
-	ld a, (test_block)
-end macro
-
-macro is_correct_block block
-; tests if the given block is the block we are searching for
-; args:
-;  block : the block we are checking against
-; return:
-;  a : block = (jmp_loc)
-; destroyed:
-;  bc
-	ld a, false
-	ld (test_block + block), a
-	ld bc, test_block
-	ld c, (jmp_loc)
-	ld a, true
-	ld (bc), a
-	ld a, (test_block + block)
-end macro
-
-macro select_pointer p1, p2
-; returns p1 if a = false or p2 when a = true
-; args:
-;  a : which pointer to select
-; return:
-;  hl : the selected pointer
-	ld hl, p1
-	ld (test_block), hl
-	ld hl, p2
-	ld (test_block + true), hl
-	ld hl, test_block
-	ld l, a
-	ld hl, (hl)
-end macro
-
-macro select_pointer_bc p1, p2
-; returns p1 if a = false or p2 when a = true
-; args:
-;  a : which pointer to select
-; return:
-;  bc : the selected pointer
-; destroyes:
-;  de
-	ld d, h
-	ld e, l
-	ld hl, p1
-	ld (test_block), hl
-	ld hl, p2
-	ld (test_block + true), hl
-	ld hl, test_block
-	ld l, a
-	ld bc, (hl)
-	ld h, d
-	ld l, e
-end macro
-
-
-;------------------------------------------------------------------------------
-
 
 ;control flow ------------------------------------------------------------------
 
@@ -133,22 +52,27 @@ jmp_target: db 0
 
 ; these vars contain the correct value if execution is on
 ;  otherwise they contain dummy values
-inc_table_dum: dl inc_table		
-dec_table_dum: dl dec_table
+inc_table_dum:  dl inc_table		
+dec_table_dum:  dl dec_table
+jmp_target_dum: dl jmp_target
 
 macro turn_on_if_a
 ; enables execution if a = true
-	ld hl, dummy_block ;ed
+	ld hl, dummy_block 
 	ld (test_block  + 0), hl
-	ld hl, test_block ;eb
+	ld hl, test_block 
 	ld (test_block  + 3), hl
-	ld hl, inc_table ;ab
+	ld hl, inc_table 
 	ld (test_block  + 6), hl 
-	ld hl, dec_table ;ac
+	ld hl, dec_table 
 	ld (test_block  + 9), hl
-	ld hl, same_table ;ad
+	ld hl, jmp_target 
+	ld (test_block + 12), hl
+	ld hl, same_table
 	ld (dummy_block + 6), hl
 	ld (dummy_block + 9), hl
+	ld hl, dummy_block
+	ld (dummy_block + 12), hl
 	;-----------------; load dummy or real block
 	ld hl, test_block
 	ld l, a
@@ -161,6 +85,10 @@ macro turn_on_if_a
 	ld l, 9
 	ld bc, (hl)				
 	ld (dec_table_dum), bc
+	;-----------------; setup jmp_target_dum
+	ld l, 12
+	ld bc, (hl)				
+	ld (jmp_target_dum), bc
 	;-----------------; setup off
 	ld d, a
 	ld a, true
@@ -176,17 +104,21 @@ end macro
 
 macro turn_off_if_a
 ; disables execution if a = true
-	ld hl, test_block ;eb
+	ld hl, test_block 
 	ld (test_block  + 0), hl
-	ld hl, dummy_block ;ed
+	ld hl, dummy_block 
 	ld (test_block  + 3), hl
-	ld hl, inc_table ;ab
+	ld hl, inc_table 
 	ld (test_block  + 6), hl 
-	ld hl, dec_table ;ac
+	ld hl, dec_table 
 	ld (test_block  + 9), hl
-	ld hl, same_table ;ad
+	ld hl, jmp_target 
+	ld (test_block + 12), hl
+	ld hl, same_table
 	ld (dummy_block + 6), hl
 	ld (dummy_block + 9), hl
+	ld hl, dummy_block
+	ld (dummy_block + 12), hl
 	;-----------------; load dummy or real block
 	ld hl, test_block
 	ld l, a
@@ -199,6 +131,10 @@ macro turn_off_if_a
 	ld l, 9
 	ld bc, (hl)				
 	ld (dec_table_dum), bc
+	;-----------------; setup jmp_target_dum
+	ld l, 12
+	ld bc, (hl)				
+	ld (jmp_target_dum), bc
 	;-----------------; setup off
 	ld hl, off
 	ld (hl), a
@@ -226,17 +162,15 @@ macro terminate_if_on
 end macro
 
 macro jmp_if_a to
-; jumps to the given location if a = true
+; jumps to the given location if a = true and we are on
 ; args:
 ;  a : whether to jump
 ; returns:
 ;  n/a
-
-	;IMPLEMENT DON'T JUMP IF OFF
 	ld hl, dummy_block
 	ld (test_block + 0), hl
-	ld hl, jmp_target
-	ld (test_block + 3), hl
+	ld hl, (jmp_target_dum)
+	ld (test_block + 3), hl	
 	ld hl, test_block
 	ld l, a
 	ld hl, (hl)
@@ -246,6 +180,7 @@ end macro
 
 macro jmp_dest id
 ; if jmp_target = id enable execution
+
 	ld a, 0
 	ld (test_block), a
 	ld a, false
@@ -261,15 +196,7 @@ macro jmp_dest id
 	ld l, a
 	ld (hl), true   				;if we were on we wrote true to test_block[0]
 	ld a, (test_block)
-	
-	; unconditionally turn off	
-	ld hl, inc_table
-	ld (inc_table_dum), hl
-	ld hl, dec_table
-	ld (dec_table_dum), hl
-	ld hl, off
-	ld (hl), true
-	
+		
 	; turn on if a
 	turn_on_if_a	
 end macro
@@ -416,15 +343,20 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-	open_debugger
-
+	
+	ld a, true
+	turn_off_if_a
+	
 code_start:
-
 	add_code_start_to_stack
 
-	ld a, true
-	ld (off), a
-	terminate_if_on
+	open_debugger
 
+	ld a, true
+	jmp_if_a $0A
+	
+	jmp_dest $0A
+	
+	terminate_if_on
 	ret
 	
