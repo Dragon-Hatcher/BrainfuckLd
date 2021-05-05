@@ -131,70 +131,82 @@ off: 				db false
 terminate: 	db false
 jmp_target: db 0
 
-inc_table_dum: dl inc_table
+; these vars contain the correct value if execution is on
+;  otherwise they contain dummy values
+inc_table_dum: dl inc_table		
 dec_table_dum: dl dec_table
 
 macro turn_on_if_a
-; enables execution if a = true
-	ld (test_block  + 0), dummy_block
-	ld (test_block  + 3), test_block
-	ld (test_block  + 6), inc_table
-	ld (test_block  + 9), dec_table
-	ld (dummy_block + 6), same_table
-	ld (dummy_block + 9), same_table
+; disables execution if a = true
+	ld hl, dummy_block ;ed
+	ld (test_block  + 0), hl
+	ld hl, test_block ;eb
+	ld (test_block  + 3), hl
+	ld hl, inc_table ;ab
+	ld (test_block  + 6), hl 
+	ld hl, dec_table ;ac
+	ld (test_block  + 9), hl
+	ld hl, same_table ;ad
+	ld (dummy_block + 6), hl
+	ld (dummy_block + 9), hl
+	;-----------------; load dummy or real block
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;
 	;-----------------; setup inc_table_dum
-	ld hl, test_block
-	ld l, a
-	ld hl, (hl)				;load dummy or real block
 	ld l, 6
-	ld bc, (hl)				;find inc_table or same_table
-	ld hl, inc_table_dum
-	ld (hl), bc
+	ld bc, (hl)				
+	ld (inc_table_dum), bc
 	;-----------------; setup dec_table_dum
-	ld hl, test_block
-	ld l, a
-	ld hl, (hl)				;load dummy or real block
 	ld l, 9
-	ld bc, (hl)				;find dec_table or same_table
-	ld hl, dec_table_dum
-	ld (hl), bc
+	ld bc, (hl)				
+	ld (dec_table_dum), bc
 	;-----------------; setup off
-	ld (test_block + 0), true
-	ld (test_block + 3), false
+	ld d, a
+	ld a, true
+	ld (test_block + 0), a
+	ld a, false
+	ld (test_block + 3), a
 	ld hl, test_block
-	ld l, a
-	ld b, (hl)
-	ld hl, off
-	ld (hl), b
+	ld l, d
+	ld a, (hl)
+	ld (off), a
 end macro
+
 
 macro turn_off_if_a
 ; disables execution if a = true
-	ld (test_block  + 0), test_block
-	ld (test_block  + 3), dummy_block
-	ld (test_block  + 6), inc_table
-	ld (test_block  + 9), dec_table
-	ld (dummy_block + 6), same_table
-	ld (dummy_block + 9), same_table
+	ld hl, test_block ;eb
+	ld (test_block  + 0), hl
+	ld hl, dummy_block ;ed
+	ld (test_block  + 3), hl
+	ld hl, inc_table ;ab
+	ld (test_block  + 6), hl 
+	ld hl, dec_table ;ac
+	ld (test_block  + 9), hl
+	ld hl, same_table ;ad
+	ld (dummy_block + 6), hl
+	ld (dummy_block + 9), hl
+	;-----------------; load dummy or real block
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)				;
 	;-----------------; setup inc_table_dum
-	ld hl, test_block
-	ld l, a
-	ld hl, (hl)				;load dummy or real block
 	ld l, 6
-	ld bc, (hl)				;find inc_table or same_table
-	ld hl, inc_table_dum
-	ld (hl), bc
+	ld bc, (hl)				
+	ld (inc_table_dum), bc
 	;-----------------; setup dec_table_dum
-	ld hl, test_block
-	ld l, a
-	ld hl, (hl)				;load dummy or real block
 	ld l, 9
-	ld bc, (hl)				;find dec_table or same_table
-	ld hl, dec_table_dum
-	ld (hl), bc
+	ld bc, (hl)				
+	ld (dec_table_dum), bc
 	;-----------------; setup off
 	ld hl, off
 	ld (hl), a
+end macro
+
+macro terminate_if_a
+	turn_off_if_a
+	ld sp, (stack_p0) 	;the final ret will now exit the program
 end macro
 
 macro jmp_if_a to
@@ -224,7 +236,7 @@ end macro
 
 ;inc/dec ----------------------------------------------------------------------
 
-macro inc_hl_p
+macro inc_hl_p ;x
 ; increments the byte pointed to by hl (unless jumping)
 ; args:
 ;	 (hl) : the byte to increment
@@ -235,11 +247,11 @@ macro inc_hl_p
 	ld a, (jumping)
 	select_pointer_bc inc_block, same_block
 	ld c, (hl)
-	ld a, (bc)
+	ld a, (bc)   		
 	ld (hl), a
 end macro
 
-macro dec_hl_p
+macro dec_hl_p ;x
 ; decrements the byte pointed to by hl (unless jumping)
 ; args:
 ;	 (hl) : the byte to decrement
@@ -320,7 +332,13 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-	open_debugger
 code_start:
+	open_debugger
+
+	ld a, true
+	turn_off_if_a
+	nop
+	turn_on_if_a
+
 	ret
 	
