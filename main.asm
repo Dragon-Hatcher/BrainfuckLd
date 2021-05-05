@@ -204,6 +204,15 @@ macro turn_off_if_a
 	ld (hl), a
 end macro
 
+
+macro add_code_start_to_stack
+	; adds code_start to the stack at stack_p1
+	ld hl, (stack_p1)
+	ld bc, code_start
+	ld (hl), bc
+	ld sp, (stack_p1)
+end macro
+
 macro terminate_if_a
 	turn_off_if_a
 	ld sp, (stack_p0) 	;the final ret will now exit the program
@@ -271,14 +280,20 @@ end macro
 
 ;stack ------------------------------------------------------------------------
 
-stack_p0: dl $D1A800
+stack_p0: dl 0
 stack_p1: dl 0
 stack_p2: dl 0
+stack_xx: dl 0
 
 macro init_stacks
-	;ld (stack_p0), sp
+	ld (stack_p0), sp
 	plus_one_init stack_p0, stack_p1
+	plus_one_init stack_p1, stack_xx
+	plus_one_init stack_xx, stack_p1
+
 	plus_one_init stack_p1, stack_p2
+	plus_one_init stack_p2, stack_xx
+	plus_one_init stack_xx, stack_p2
 end macro
 
 macro plus_one_init from, to
@@ -332,13 +347,16 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-code_start:
 	open_debugger
 
+code_start:
+
+	add_code_start_to_stack
+
+
+
 	ld a, true
-	turn_off_if_a
-	nop
-	turn_on_if_a
+	terminate_if_a
 
 	ret
 	
