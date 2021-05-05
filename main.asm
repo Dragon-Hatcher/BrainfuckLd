@@ -203,12 +203,18 @@ end macro
 
 macro call_if_a adr
 	; calls an adress if a = true
+	ld d, a
+
 	ld hl, dummy_block                 ;(stack_p2) = adr
 	ld (test_block + 0), hl    
 	ld hl, (stack_p2)
 	ld (test_block + 3), hl
 	ld hl, test_block
+	ld a, (off)
 	ld l, a
+	ld bc, dummy_block
+	ld (hl), bc
+	ld l, d
 	ld hl, (hl)
 	ld bc, adr
 	ld (hl), bc
@@ -218,12 +224,16 @@ macro call_if_a adr
 	ld hl, (stack_p2)
 	ld (test_block + 3), hl
 	ld hl, test_block
+	;ld a, (off)          ;already done
 	ld l, a
+	ld bc, (stack_p1)
+	ld (hl), bc
+	ld l, d
 	ld hl, (hl)
 	ld (test_block), hl
 	ld sp, (test_block)
 
-	ld d, a                             ; jmp_dest x
+	ld a, d                             ; jmp_dest x
 	jmp_dest cur_jmp_id	
 	ld a, d                             ; ld_jmp x
 	jmp_if_a cur_jmp_id
@@ -343,19 +353,10 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-	
-	ld a, true
-	turn_off_if_a
-	
+				
 code_start:
 	add_code_start_to_stack
 
-	open_debugger
-
-	ld a, true
-	jmp_if_a $0A
-	
-	jmp_dest $0A
 	
 	terminate_if_on
 	ret
