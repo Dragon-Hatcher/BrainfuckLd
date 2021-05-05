@@ -137,7 +137,7 @@ inc_table_dum: dl inc_table
 dec_table_dum: dl dec_table
 
 macro turn_on_if_a
-; disables execution if a = true
+; enables execution if a = true
 	ld hl, dummy_block ;ed
 	ld (test_block  + 0), hl
 	ld hl, test_block ;eb
@@ -224,18 +224,54 @@ macro jmp_if_a to
 ;  a : whether to jump
 ; returns:
 ;  n/a
-	ld (hl), a  ;if a is true we will be stoppped
-	ld a, to
-	ld (jmp_loc), a
+	ld hl, dummy_block
+	ld (test_block + 0), hl
+	ld hl, jmp_target
+	ld (test_block + 3), hl
+	ld hl, test_block
+	ld l, a
+	ld hl, (hl)
+	ld (hl), to
+	turn_off_if_a
+end macro
+
+macro jmp_dest id
+; if jmp_target = id enable execution
+	ld a, 0
+	ld (test_block), a
+	ld a, false
+	ld (test_block + id), a
+	ld a, (jmp_target)
+	ld hl, test_block
+	ld l, a
+	ld (hl), true
+	ld a, (test_block + id) ;a = id == jmp_target
+	ld (test_block), a			;test_block[0] contains id == jmp
+	ld hl, test_block
+	ld a, (off)
+	ld l, a
+	ld (hl), true   				;if we were on we wrote true to test_block[0]
+	ld a, (test_block)
+	
+	; unconditionally turn off	
+	ld hl, inc_table
+	ld (inc_table_dum), hl
+	ld hl, dec_table
+	ld (dec_table_dum), hl
+	ld hl, off
+	ld (hl), true
+	
+	; turn on if a
+	turn_on_if_a	
 end macro
 
 macro call_if_a adr
 	; calls an adress if a = true
 	
-	; running = false
-	; stack_p1 = code_start
-	; stack_p2 = adr
-	; sp = stack_p2
+	; jmp_dest x
+	;   stack_p2 = adr  
+	;   sp = stack_p2
+	; 	ld_jmp x
 	
 	cur_jmp_id = cur_jmp_id + 1
 end macro
@@ -351,12 +387,19 @@ _main:
 
 code_start:
 
-	add_code_start_to_stack
-
-
+	;add_code_start_to_stack
 
 	ld a, true
-	terminate_if_a
+	jmp_if_a $0A
+	
+	nop
+	nop
+	nop
+	
+	jmp_dest $0B
+
+	;ld a, true
+	;terminate_if_a
 
 	ret
 	
