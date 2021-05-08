@@ -11,12 +11,18 @@ dummy_block := first_block + block_size * 2
 mem_block		:= first_block + block_size * 4
 
 
+
 ;math tables ----------------------------------------------------------------------
 
 rb (-$) and $FF
 inc_table:  make_inc_table
 dec_table:  make_dec_table
 same_table: make_same_table
+ascii_conversion:
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $D6, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $21, $22, $23, $00, $25, $26, $27, $28, $29, $2A, $2B, $2C, $2D, $2E, $2F, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $3A, $3B, $3C, $3D, $3E, $3F, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $4A, $4B, $4C, $4D, $4E, $4F, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $5A, $C1, $5C, $5D, $5E, $5F, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $6A, $6B, $6C, $6D, $6E, $6F, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $7A, $7B, $7C, $7D, $7E, $00
+	repeat 128
+		db % + 127
+	end repeat
 
 macro make_inc_table
 	repeat 255
@@ -43,11 +49,13 @@ end macro
 
 ;control flow ------------------------------------------------------------------
 
-cur_jmp_id = 0
+cur_jmp_id = $EE
 
 off: 				db false
 terminate: 	db false
 jmp_target: db 0
+a_call_arg: db 0
+write_a:    db false
 
 ; these vars contain the correct value if execution is on
 ;  otherwise they contain dummy values
@@ -164,6 +172,7 @@ macro jmp_if_a to
 ;  a : whether to jump
 ; returns:
 ;  n/a
+
 	ld hl, dummy_block
 	ld (test_block + 0), hl
 	ld hl, (jmp_target_dum)
@@ -172,12 +181,22 @@ macro jmp_if_a to
 	ld l, a
 	ld hl, (hl)
 	ld (hl), to
+
+	ld (test_block + 3), a  ;if we are off set a to true
+	ld hl, test_block
+	ld a, (off)
+	ld l, a
+	ld (hl), true
+	ld a, (test_block + 3)
+	
 	turn_off_if_a
+	
 end macro
 
 macro jmp_dest id
 ; if jmp_target = id enable execution
 
+	ld a, id
 	ld a, 0
 	ld (test_block), a
 	ld a, false
@@ -194,48 +213,71 @@ macro jmp_dest id
 	ld (hl), true   				;if we were on we wrote true to test_block[0]
 	ld a, (test_block)
 		
-	; turn on if a
 	turn_on_if_a	
+
 end macro
 
 macro call_if_a adr
-	; calls an adress if a = true
-	ld d, a
+	; calls an adress
 
-	ld hl, dummy_block                 ;(stack_p2) = adr
+	ld hl, (stack_p2)                 ;(stack_p2) = adr
 	ld (test_block + 0), hl    
-	ld hl, (stack_p2)
+	ld hl, dummy_block
 	ld (test_block + 3), hl
 	ld hl, test_block
 	ld a, (off)
 	ld l, a
-	ld bc, dummy_block
-	ld (hl), bc
-	ld l, d
 	ld hl, (hl)
 	ld bc, adr
 	ld (hl), bc
 
-	ld hl, (stack_p1)
-	ld (test_block + 0), hl
 	ld hl, (stack_p2)
-	ld (test_block + 3), hl
+	ld (test_block + 0), hl
+	ld (test_block + 3), sp
 	ld hl, test_block
-	;ld a, (off)          ;already done
 	ld l, a
-	ld bc, (stack_p1)
-	ld (hl), bc
-	ld l, d
 	ld hl, (hl)
 	ld (test_block), hl
 	ld sp, (test_block)
 
-	ld a, d                             ; jmp_dest x
-	jmp_dest cur_jmp_id	
-	ld a, d                             ; ld_jmp x
-	jmp_if_a cur_jmp_id
+	ld a, true              ; 
+	jmp_if_a cur_jmp_id	- 0 ;>+
+	jmp_dest cur_jmp_id - 1 ;<+-+
+	ld a, true              ; | |
+	jmp_if_a cur_jmp_id - 2 ;>+-+-+
+	jmp_dest cur_jmp_id - 0 ;<+ | |
+	ld a, true              ;   | |
+	jmp_if_a cur_jmp_id - 1 ;>--+ |
+	jmp_dest cur_jmp_id - 2 ;<----+
 	
-	cur_jmp_id = cur_jmp_id + 1
+	cur_jmp_id = cur_jmp_id - 3
+end macro
+
+macro mem_pointer_is_0
+	ld a, false
+	ld (test_block), a
+	ld hl, (mem_pointer)
+	ld a, (hl)
+	ld hl, test_block
+	ld l, a
+	ld a, true
+	ld (hl), a
+	ld a, (test_block)
+end macro
+
+macro maybe_write_a
+	ld d, a
+	ld hl, dummy_block
+	ld (test_block + 0), hl
+	ld hl, (mem_pointer)
+	ld (test_block + 3), hl
+	ld hl, test_block
+	ld a, (write_a)
+	ld l, a
+	ld hl, (hl)
+	ld (hl), d
+	ld a, false
+	ld (write_a), a
 end macro
 
 ;------------------------------------------------------------------------------
@@ -243,7 +285,7 @@ end macro
 
 ;inc/dec ----------------------------------------------------------------------
 
-mem_pointer: dl $D100FF;mem_block
+mem_pointer: dl mem_block
 
 macro inc_mem_pointer
 ; 24 bit increments the mem pointer
@@ -269,6 +311,10 @@ macro inc_mem_pointer
 	ld (mem_pointer + 1), a
 
 	;----------
+
+	ld hl, (mem_pointer)
+	ld (mem_block - 3), hl
+
 
 	;ld a, (mem_pointer + 2)
 	;ld (test_block + $00), a            ;test_block + $00	
@@ -309,6 +355,9 @@ macro dec_mem_pointer
 	ld (mem_pointer + 1), a
 
 	;----------
+
+	ld hl, (mem_pointer)
+	ld (mem_block - 3), hl
 
 	;ld a, (mem_pointer + 2)
 	;ld (test_block + $FF), a            ;test_block + $FF
@@ -403,6 +452,128 @@ end macro
 ;------------------------------------------------------------------------------
 
 
+;commands ---------------------------------------------------------------------
+
+macro bf_plus
+	ld hl, (mem_pointer)
+	inc_hl_p
+end macro
+
+macro bf_minus
+	ld hl, (mem_pointer)
+	dec_hl_p
+end macro
+
+macro bf_left
+	dec_mem_pointer
+end macro
+
+macro bf_right
+	inc_mem_pointer
+end macro
+
+macro bf_period
+	call_if_a ti.PutC
+	ld hl, (mem_pointer)
+	ld a, (hl)
+	ld (a_call_arg), a
+end macro
+
+macro bf_comma
+	ld a, true
+	ld (test_block + 0), a
+	ld a, (write_a)
+	ld (test_block + 3), a
+	ld hl, test_block
+	ld a, (off)
+	ld l, a
+	ld a, (hl)
+	ld (write_a), a
+	call_if_a ti.GetKey
+end macro
+
+top_id = 0
+bracket_ids =: 0
+
+macro bf_open_b
+	bracket_ids =: top_id
+
+	display '['
+	repeat 1, value: top_id, value2: bracket_ids
+	display `value, '|', `value2, 10
+	end repeat
+
+	jmp_dest top_id + 0   ;<-- This destination triggers the bf_period loop around
+	mem_pointer_is_0
+	jmp_if_a top_id + 1
+	
+	top_id = top_id + 2
+end macro
+
+macro bf_close_b
+
+	display ']'
+	repeat 1, value: bracket_ids
+	display `value, 10
+	end repeat
+
+	ld a, true
+	jmp_if_a bracket_ids + 0
+	jmp_dest bracket_ids + 1
+
+	restore bracket_ids
+	
+end macro
+
+calminstruction bf commands&
+loop:
+	match =+ commands?, commands
+	jyes plus
+	match =- commands?, commands
+	jyes minus
+	match =< commands?, commands
+	jyes left
+	match => commands?, commands
+	jyes right
+	match =[ commands?, commands
+	jyes enter
+	match =] commands?, commands
+	jyes leave
+	match =. commands?, commands
+	jyes output
+	match =, commands?, commands
+	jyes input
+	match commands commands?, commands
+	jyes loop
+	exit
+plus:
+	execute =bf_plus
+	jump loop
+minus:
+	execute =bf_minus
+	jump loop
+left:
+	execute =bf_left
+	jump loop
+right:
+	execute =bf_right
+	jump loop
+enter:
+	execute =bf_open_b
+	jump loop
+leave:
+	execute =bf_close_b
+	jump loop
+output:
+	execute =bf_period
+	jump loop
+input:
+	execute =bf_comma
+	jump loop
+end calminstruction
+;------------------------------------------------------------------------------
+
+
 macro open_debugger
 	scf
 	sbc    hl,hl
@@ -415,16 +586,32 @@ jmp_loc: 	db 0
 public _main
 _main:
 	init_stacks
-				
+			
 code_start:
+
+	;open_debugger
+
+	maybe_write_a
 	add_code_start_to_stack
-
-	open_debugger
-
-	ld hl, mem_pointer
-
-	inc_mem_pointer
 	
-	terminate_if_on
+	bf +++++++++++\
+>+>>>>++++++++++++++++++++++++++++++++++++++++++++\
+>++++++++++++++++++++++++++++++++<<<<<<[>[>>>>>>+>\
++<<<<<<<-]>>>>>>>[<<<<<<<+>>>>>>>-]<[>++++++++++[-\
+<-[>>+>+<<<-]>>>[<<<+>>>-]+<[>[-]<[-]]>[<<[>>>+<<<\
+-]>>[-]]<<]>>>[>>+>+<<<-]>>>[<<<+>>>-]+<[>[-]<[-]]\
+>[<<+>>[-]]<<<<<<<]>>>>>[+++++++++++++++++++++++++\
++++++++++++++++++++++++.[-]]++++++++++<[->-<]>++++\
+++++++++++++++++++++++++++++++++++++++++++++.[-]<<\
+<<<<<<<<<<[>>>+>+<<<<-]>>>>[<<<<+>>>>-]<-[>>.>.<<<\
+[-]]<<[>>+>+<<<-]>>>[<<<+>>>-]<<[<+>-]>[<+>-]<<<-]	
+	terminate_if_on	
+	
+;	open_debugger
+	
+	ld hl, ascii_conversion
+	ld a, (a_call_arg)	
+	ld l, a
+	ld a, (hl)
+	
 	ret
-	
